@@ -33,7 +33,8 @@ app.post("/signup", async (req, res) => {
   }
 
   const CreateUsers = await pool.query(
-    "INSERT INTO users (username ,email, password) VALUES ($1, $2, $3)", [username, email, password],
+    "INSERT INTO users (username ,email, password) VALUES ($1, $2, $3)",
+    [username, email, password],
   );
 
   res.json({
@@ -46,11 +47,11 @@ app.post("/signin", async (req, res) => {
 
   let UserExist = await pool.query(
     "SELECT * FROM users WHERE email = $1 AND password = $2",
-    [email, password]
+    [email, password],
   );
-  if (!UserExist) {
+  if (!UserExist || UserExist.rows.length === 0) {
     res.status(403).json({
-      message: " user not exist with this credentials",
+      message: "user not exist with this credentials",
     });
     return;
   }
@@ -69,83 +70,126 @@ app.post("/signin", async (req, res) => {
 
 // ----------------------- NOTE SECTION  --------------------------------------------------
 
-app.post("/Create-notes", authmiddleware, (req, res) => {
-  const userId = req.userid;
+app.post("/Create-notes", authmiddleware, async (req, res) => {
+  const userId = req.userId;
   let Title = req.body.Title;
-  let desc = req.body.desc;
+  let description = req.body.description;
 
-  const createNotes = pool.query("INSERT INTO notes (Title, desc) VALUES ($1, $2)",[Title, desc])
+  const createNotes = await pool.query(
+    `INSERT INTO notes (Title, description, userid) VALUES ($1, $2, $3)`,
+    [Title, description, userId],
+  );
 
-//   NOTES.push({
-//     NoteId: NoteId++,
-//     Title,
-//     desc,
-//     userId,
-//   });
+  //   NOTES.push({
+  //     NoteId: NoteId++,
+  //     Title,
+  //     desc,
+  //     userId,
+  //   });
   res.json({
     message: "Note is created",
+    createNotes,
   });
 });
 
-app.get("/allNotes", authmiddleware, (req, res) => {
+app.get("/allNotes", authmiddleware, async (req, res) => {
   const userId = req.userId;
 
-  const Usernotes = NOTES.filter((n) => Number(n.userId) === Number(userId));
+  const Usernotes = await pool.query(`SELECT * FROM notes WHERE userid =$1`, [
+    userId,
+  ]);
 
   res.json({
-    allnotes: Usernotes,
+    allnotes: Usernotes.rows,
     users: {
       id: userId,
     },
   });
 });
 
-app.put("/notes", authmiddleware, (req, res) => {
+app.put("/notes", authmiddleware, async (req, res) => {
   const userId = req.userId;
-  const NoteId = parseInt(req.query.NoteId);
-  const NewTitle = req.body.NewTitle;
-  const NewDesc = req.body.NewDesc;
-
-  const noteIndex = NOTES.findIndex(
-    (n) => n.NoteId === NoteId && n.userId === userId,
+  const noteid = parseInt(
+    req.query.noteid || req.query.noteId || req.body.noteid || req.body.noteId,
+    10,
   );
-  if (noteIndex === -1) {
+  const NewTitle = req.body.NewTitle;
+  const NewDescription = req.body.NewDescription;
+
+  if (!noteid) {
+    return res.status(400).json({
+      message: "noteid is required",
+    });
+  }
+
+  const FindNote = await pool.query(
+    `SELECT * FROM notes WHERE noteid = $1 AND userid = $2`,
+    [noteid, userId],
+  );
+  if (FindNote.rows.length === 0) {
     return res.status(404).json({
       message: "Note not found or not owned by user",
     });
   }
 
-  if (NewTitle !== undefined) {
-    NOTES[noteIndex].Title = NewTitle;
+  if (NewTitle === undefined && NewDescription === undefined) {
+    return res.status(400).json({
+      message: "Please provide NewTitle or NewDescription to update",
+    });
   }
-  if (NewDesc !== undefined) {
-    NOTES[noteIndex].desc = NewDesc;
-  }
+
+  const UpdateNote = await pool.query(
+    `UPDATE notes
+    SET Title = COALESCE($1, Title), description = COALESCE($2, description)
+    WHERE noteid = $3 AND userid = $4
+    RETURNING *`,
+    [NewTitle, NewDescription, noteid, userId],
+  );
 
   res.json({
     message: "Note updated successfully",
-    updatedNote: NOTES[noteIndex],
+    updatedNote: UpdateNote.rows[0],
   });
 });
 
 app.delete("/Delete-note", authmiddleware, async (req, res) => {
   const userId = req.userId;
-  const noteId = parseInt(req.query.noteId);
+  const noteid = parseInt(req.query.noteid);
 
-  const noteIndex = NOTES.findIndex(
-    (n) => n.NoteId === noteId && n.userId === userId,
-  );
-
-  if (noteIndex === -1) {
-    return res.status(404).json({
-      message: "Note not found",
+  if (!noteid) {
+    res.status(403).json({
+      message: "noteid is required",
     });
+    return;
   }
 
-  NOTES.splice(noteIndex, 1);
+  const FindNote = pool.query(
+    `
+    SELECT * FROM notes WHERE noteid = $1 AND userid = $2`,
+    [noteid, userId],
+  );
 
+  if ((await FindNote).rows.length === 0) {
+    res.status(403).json({
+      message: "note not found in db",
+    });
+    return;
+  }
+
+  const DeleteNote = pool.query(
+    `
+    DELETE FROM notes 
+    WHERE noteid = $1 AND userid = $2 RETURNING *
+    `,
+    [noteid, userId],
+  );
+
+  // const noteIndex = NOTES.findIndex(
+  //   (n) => n.NoteId === noteId && n.userId === userId,
+  // );
   res.json({
     message: "note deleted successfully",
+    FindNote
   });
 });
 
