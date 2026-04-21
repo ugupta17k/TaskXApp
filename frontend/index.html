@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+
+
+    <script>
+        function signUp(){
+            window.location = '/signup'
+        }
+        function signIn(){
+            window.location = '/signin'
+        }
+    </script>
+
+  </head>
+  <body>
+    <div class="w-full h-screen bg-zinc-900 p-10">
+      <div class="flex justify-between">
+        <h1 class="text-white text-2xl font-bold">TaskXApp</h1>
+        <div>
+          <button class=" cursor-pointer font-bold mr-4 rounded-xl bg-white pl-4 pr-4 pt-2 pb-2" onclick=signIn()>
+            LOGIN
+          </button>
+          <button class=" cursor-pointer font-bold rounded-xl bg-white pl-4 pr-4 pt-2 pb-2" onclick=signUp()>
+            REGISTER
+          </button>
+        </div>
+      </div>
+      <div class="flex flex-col justify-center items-center mt-50">
+        <h1 class="text-[4rem] text-white">WELCOME TO TASKXAPP</h1>
+        <h1 class="text-[1rem] opacity-[0.5] mt-5 text-white">First Register/Login to see your all Task</h1>
+      </div>
+    </div>
+  </body>
+</html>

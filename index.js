@@ -11,11 +11,20 @@ const pool = new Pool({
 const app = express();
 app.use(express.json());
 
-let NoteId = 1;
-let taskId = 1;
 
-let NOTES = [];
-let task = [];
+app.get('/', (req,res)=>{
+  res.sendFile('/Users/ugupt/OneDrive/Desktop/UG-Projects/practice-project/taskApp/frontend/index.html')
+})
+app.get('/signup', (req,res)=>{
+  res.sendFile('/Users/ugupt/OneDrive/Desktop/UG-Projects/practice-project/taskApp/frontend/signup.html')
+})
+app.get('/signin', (req,res)=>{
+  res.sendFile('/Users/ugupt/OneDrive/Desktop/UG-Projects/practice-project/taskApp/frontend/signin.html')
+})
+app.get('/allNotes', (req,res)=>{
+  res.sendFile('/Users/ugupt/OneDrive/Desktop/UG-Projects/practice-project/taskApp/frontend/Dashboard.html')
+})
+
 
 // ----------------- SIGNUP SIGNIN --------------------------------------------------------
 
