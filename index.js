@@ -169,7 +169,7 @@ app.delete("/Delete-note", authmiddleware, async (req, res) => {
     [noteid, userId],
   );
 
-  if ((await FindNote).rows.length === 0) {
+  if (FindNote.rows.length === 0) {
     res.status(403).json({
       message: "note not found in db",
     });
@@ -189,20 +189,77 @@ app.delete("/Delete-note", authmiddleware, async (req, res) => {
   // );
   res.json({
     message: "note deleted successfully",
-    FindNote
+    FindNote,
   });
 });
 
 // ----------------------- TASK SECTION ---------------------------------------------
 
-app.post("/task", authmiddleware, (req, res) => {
+app.post("/task", authmiddleware, async (req, res) => {
   const userId = req.userId;
-  const taskTitle = req.body.taskTitle;
-  const NoteId = parseInt(req.query.NoteId);
+  const taskTitle = req.body.tasktitle;
+  const noteid = Number(req.query.noteid);
 
-  const NoteExist = NOTES.find(
-    (n) => n.NoteId === NoteId && n.userId === userId,
+  if (!noteid) {
+    res.send(403).json({
+      message: "note id is required",
+    });
+    return;
+  }
+  console.log(userId);
+  
+
+  const NoteExist = await pool.query(
+    `SELECT * FROM notes WHERE userid = $1 AND noteid = $2`,
+    [userId, noteid],
   );
+  // const NoteExist = NOTES.find(
+  //   (n) => n.NoteId === NoteId && n.userId === userId,
+  // );
+  if (NoteExist.rows.length === 0 ) {
+    res.status(403).json({
+      message: "note not found",
+    });
+    return;
+  }
+
+  const AddTask = await pool.query(
+    `INSERT INTO task (tasktitle, userid, noteid) VALUES ($1, $2, $3) RETURNING *`,
+    [taskTitle, userId, noteid],
+  );
+
+  // task.push({
+  //   taskId: taskId++,
+  //   taskTitle,
+  //   userId,
+  //   NoteId,
+  // });
+
+  res.json({
+    message: "task created successfully",
+    AddTask: AddTask.rows[0],
+  });
+});
+
+app.get("/allTask", authmiddleware, async (req, res) => {
+  const userId = req.userId;
+  const noteid = Number(req.query.noteid);
+
+  if (!noteid) {
+    return res.status(404).json({
+      message: "note id is required",
+    });
+  }
+  // console.log(userId);
+  // console.log(noteid);
+  
+
+  const NoteExist = pool.query(
+    `
+    SELECT * FROM notes WHERE noteid = $1 AND userid = $2`,
+    [noteid, userId],
+  );
+
   if (!NoteExist) {
     res.status(403).json({
       message: "note not found",
@@ -210,122 +267,113 @@ app.post("/task", authmiddleware, (req, res) => {
     return;
   }
 
-  task.push({
-    taskId: taskId++,
-    taskTitle,
-    userId,
-    NoteId,
-  });
-
-  res.json({
-    message: "task created successfully",
-  });
-});
-
-app.get("/allTask", authmiddleware, (req, res) => {
-  const userId = req.userId;
-  const NoteId = parseInt(req.query.NoteId);
-
-  const NoteExist = NOTES.find(
-    (n) => n.NoteId === NoteId && n.userId === userId,
+  const Findtask = await pool.query(
+    "SELECT * FROM task WHERE userid = $1 AND noteid = $2",
+    [userId, noteid]
   );
-  if (!NoteExist) {
-    res.status(403).json({
-      message: "note not found with this noteID",
-    });
-    return;
+
+  if(Findtask.rows.length === 0){
+    return res.status(404).json({
+      message:"task not found "
+    })
   }
 
-  const Findtask = task.filter(
-    (t) =>
-      Number(t.userId) === Number(userId) &&
-      Number(t.NoteId) === Number(NoteId),
-  );
-
   res.json({
-    allTask: Findtask,
+    allTask: Findtask.rows,
     idss: {
       userId,
-      NoteId,
+      noteid,
     },
   });
 });
 
-app.put("/Update-task", authmiddleware, (req, res) => {
+app.put("/Update-task", authmiddleware, async (req, res) => {
   const userId = req.userId;
-  const taskId = Number(req.query.taskId);
-  const NoteId = Number(req.query.NoteId);
+  const taskid = Number(req.query.taskid);
+  const noteid = Number(req.query.noteid);
   const NewTitle = req.body.NewTitle;
 
-  const NoteExist = NOTES.find(
-    (n) => n.userId === userId && n.NoteId === NoteId,
+  const NoteExist = await pool.query(
+    `SELECT * FROM notes WHERE userid = $1 AND noteid = $2`,
+    [userId, noteid],
   );
-  if (!NoteExist) {
+  if (!NoteExist.rows.length === 0) {
     res.status(404).json({
       messsage: "Note not found given credentials are not correct",
     });
     return;
   }
 
-  const TaskExist = task.find(
-    (t) => t.NoteId === NoteId && t.taskId === taskId && t.userId === userId,
+  const TaskExist = await pool.query(
+    `SELECT * FROM task WHERE userid = $1 AND noteid = $2 AND taskid = $3`,
+    [userId, noteid, taskid],
   );
-  if (!TaskExist) {
+  if (!TaskExist.rows.length === 0) {
     return res.status(404).json({
       message: "task not found given credentials are not correct",
     });
   }
 
-  const findTask = task.findIndex((tf) => tf.taskId === taskId);
-
-  if (findTask.length === -1) {
-    res.status(404).json({
-      message: "bro task is not here credentials galat hai",
-    });
-    return;
-  }
-
-  if (NewTitle !== undefined) {
-    task[findTask].taskTitle = NewTitle;
-  }
+  const UpdateTask = await pool.query(
+    `
+    UPDATE task 
+    SET tasktitle = $1 
+    WHERE userid = $2 AND noteid = $3 AND taskid = $4 RETURNING *
+    `,
+    [NewTitle, userId, noteid, taskid],
+  );
+  // const findTask = task.findIndex((tf) => tf.taskId === taskId);
 
   res.json({
-    task,
+    message: "task updated successfully",
+    UpdateTask: UpdateTask.rows,
   });
 });
 
-app.delete("/Delete-task", authmiddleware, (req, res) => {
+app.delete("/Delete-task", authmiddleware, async (req, res) => {
   const userId = req.userId;
-  const NoteId = Number(req.query.NoteId);
-  const taskId = Number(req.query.taskId);
+  const noteid = parseInt(req.query.noteid);
+  const taskid = parseInt(req.query.taskid);
 
-  const noteExist = NOTES.find(
-    (n) => n.NoteId === NoteId && n.userId === userId,
+  const noteExist = await pool.query(
+    `SELECT * FROM notes WHERE userid = $1 AND noteid = $2`,
+    [userId, noteid],
   );
-  if (!noteExist) {
+  if (noteExist.rows.length === 0) {
     res.status(404).json({
-      message: "note not exist given credentials are wrong",
+      messsage: "Note not found given credentials are not correct",
     });
     return;
   }
 
-  const taskExist = task.find(
-    (t) => t.NoteId === NoteId && t.taskId === taskId && t.userId === userId,
+  const taskExist = await pool.query(
+    `
+    SELECT * FROM task 
+    WHERE userid = $1 AND noteid = $2 AND taskid = $3`,
+    [userId, noteid, taskid],
   );
-  if (!taskExist) {
-    res.status(404).json({
-      message: "task not found given credentials are wrong",
+  if (taskExist.rows.length === 0) {
+    return res.status(404).json({
+      message: "task not found given credentials are not correct",
     });
-    return;
   }
 
-  task = task.filter(
-    (t) => !(t.NoteId === NoteId && t.taskId === taskId && t.userId === userId),
+  const DeleteTask = await pool.query(
+    `DELETE FROM task 
+     WHERE userid = $1 AND noteid = $2 AND taskid = $3 
+     RETURNING *`,
+    [userId, noteid, taskid],
   );
+
+  if (DeleteTask.rows.length === 0) {
+    return res.status(404).json({
+      message: "Task not found or not owned by user",
+    });
+  }
 
   res.json({
     message: "task deleted successfully",
-    deletedTask: taskExist,
+    deletedTask: DeleteTask.rows[0],
   });
 });
 
